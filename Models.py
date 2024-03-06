@@ -10,7 +10,7 @@ from sklearn.metrics import mean_squared_error
 
 class DataPreparing:
     def __init__(self, file_name: str):
-        self.data = read_csv(filepath_or_buffer=file_name, header=0, sep='	')
+        self.data = read_csv(filepath_or_buffer=file_name, header=0, sep=',')
 
     def split_data(self) -> object:
         samples = self.data.iloc[:, 0]
@@ -35,6 +35,15 @@ class Models:
 
 
 '''samples_train, targets_train = DataPreparing('water.csv').split_data()
+models = Models(samples_train, targets_train)
+
+regression, degree = models.regression()
+predictions = regression.predict(PolynomialFeatures(degree=degree).fit_transform(samples_train.to_frame()))
+print(predictions)
+print(f'RMSE: {np.sqrt(mean_squared_error(targets_train, predictions))}')
+print(degree)'''
+
+'''samples_train, targets_train = DataPreparing('air.csv').split_data()
 models = Models(samples_train, targets_train)
 
 regression, degree = models.regression()
