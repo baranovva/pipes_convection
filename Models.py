@@ -1,16 +1,15 @@
 import numpy as np
+import pandas as pd
 
-from pandas import read_csv
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import make_pipeline
-from sklearn.metrics import mean_squared_error
 
 
 class DataPreparing:
     def __init__(self, file_name: str):
-        self.data = read_csv(filepath_or_buffer=file_name, header=0, sep=',')
+        self.data = pd.read_csv(filepath_or_buffer=file_name, header=0, sep=',')
 
     def split_data(self) -> object:
         samples = self.data.iloc[:, 0]
@@ -26,28 +25,33 @@ class Models:
     def regression(self) -> object:
         parameters = {'polynomialfeatures__degree': np.arange(1, 5)}
         search = GridSearchCV(make_pipeline(PolynomialFeatures(), LinearRegression()),
-                              param_grid=parameters, n_jobs=-1, cv=5)
+                              param_grid=parameters, n_jobs=-1)
         search.fit(self.samples_train, self.targets_train)
         best_degree = search.best_params_['polynomialfeatures__degree']
         poly = PolynomialFeatures(degree=best_degree).fit_transform(self.samples_train)
-        model = LinearRegression(n_jobs=-1)
-        return model.fit(poly, self.targets_train), best_degree
+        return LinearRegression(n_jobs=-1).fit(poly, self.targets_train), best_degree
 
 
-'''samples_train, targets_train = DataPreparing('water.csv').split_data()
-models = Models(samples_train, targets_train)
+class Material:
+    def __init__(self, T, p, path):
+        self.T = T
+        self.p = p
 
-regression, degree = models.regression()
-predictions = regression.predict(PolynomialFeatures(degree=degree).fit_transform(samples_train.to_frame()))
-print(predictions)
-print(f'RMSE: {np.sqrt(mean_squared_error(targets_train, predictions))}')
-print(degree)'''
+        index = np.array(pd.read_csv(path, header=0, sep=',', usecols=[0]))
 
-'''samples_train, targets_train = DataPreparing('air.csv').split_data()
-models = Models(samples_train, targets_train)
+        if round(T) not in index:
+            samples, targets = DataPreparing(path).split_data()
+            regression, degree = Models(samples, targets).regression()
+            material = regression.predict(self._temp(degree))
+        else:
+            index = np.where(index == round(T))[0]
+            material = np.array(pd.read_csv(path, header=0, sep=',', usecols=range(1, 6), skiprows=index[0], nrows=1))
 
-regression, degree = models.regression()
-predictions = regression.predict(PolynomialFeatures(degree=degree).fit_transform(samples_train.to_frame()))
-print(predictions)
-print(f'RMSE: {np.sqrt(mean_squared_error(targets_train, predictions))}')
-print(degree)'''
+        self.ro = material[:, 0]
+        self.c_p = material[:, 1]
+        self.lambd = material[:, 2]
+        self.Pr = material[:, 3]
+        self.Mu = material[:, 4]
+
+    def _temp(self, PF_degree: float):
+        return PolynomialFeatures(PF_degree).fit_transform(np.array([self.T]).reshape(-1, 1))
