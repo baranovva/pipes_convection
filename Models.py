@@ -47,7 +47,10 @@ class Material:
             index = np.where(index == round(T))[0]
             material = np.array(pd.read_csv(path, header=0, sep=',', usecols=range(1, 6), skiprows=index[0], nrows=1))
 
-        self.ro = material[:, 0]
+        if path == "data/air.csv":
+            self.ro = p * material[:, 0]
+        else:
+            self.ro = material[:, 0]
         self.c_p = material[:, 1]
         self.lambd = material[:, 2]
         self.Pr = material[:, 3]

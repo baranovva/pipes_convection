@@ -1,4 +1,5 @@
 from functools import wraps
+from buttons import show_error_popup
 
 
 class Nu:
@@ -31,8 +32,7 @@ class Nu:
                     elif self.Re > 5e4 and self.Re <= 5e5:
                         return 0.0208 * self.Re ** 0.814
                     else:
-                        print('Неверный интервал значений Re, выберете другой режим работы')
-                        exit(0)
+                        show_error_popup('Неверный интервал значений (Nu external)')
 
                 return func(self) * Nu_circle(self)
 
@@ -71,5 +71,4 @@ class Nu:
                 # если среда - жидкость
                 return 0.027 * (self.Re ** 0.8) * (self.Pr ** 0.33) * ((self.Mu / self.Mu_wall) ** 0.14)
             else:
-                print('Неверный интервал значений, выберете другой режим работы')
-                exit(0)
+                show_error_popup('Неверный интервал значений (Nu internal)')
