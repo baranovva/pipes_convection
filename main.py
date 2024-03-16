@@ -1,9 +1,10 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, BooleanVar, Checkbutton
 from math import log, pi
 from Nu import Nu
 from Models import Material
 from buttons import show_error_popup, show_about
+from radiantion import radiation
 
 
 def a(nusselt: float, lambd: float, d: float):
@@ -12,8 +13,9 @@ def a(nusselt: float, lambd: float, d: float):
 
 
 def calculate():
-    path_external = entry_path_external.get()
-    path_internal = entry_path_internal.get()
+    path_external = 'data/' + entry_path_external.get() + '.csv'
+    path_internal = 'data/' + entry_path_internal.get() + '.csv'
+    is_use_radiation = rad.get()
 
     is_gaz_external = True
     is_gaz_internal = True
@@ -57,8 +59,8 @@ def calculate():
     if lambda_pipe <= 0:
         show_error_popup('Неверное значение теплопроводности трубы')
 
-    t_wall = (t_external + t_inlet) / 2
     t_avg = (t_inlet + t_out) / 2
+    t_wall = (t_external + t_avg) / 2
     delta_T_max = max((t_inlet - t_external), (t_out - t_external))
     delta_T_min = min((t_inlet - t_external), (t_out - t_external))
     delta_T_ln = (delta_T_max - delta_T_min) / log(delta_T_max / delta_T_min)  # log профиль температуры
@@ -76,6 +78,9 @@ def calculate():
                                     is_gaz=is_gaz_external).calculate()  # Уонг стр 72
     a_external = a(nusselt=avg_Nu_external, lambd=material_external.lambd, d=d_external)  # коэф теплоотдачи внешний
 
+    if is_use_radiation and is_gaz_external:
+        a_external += radiation(t_wall)
+
     avg_Nu_in = Nu.NuInternal(Re=Re_in, Pr=material_in_avg.Pr, is_gaz=is_gaz_internal,
                               Mu=material_in_avg.Mu, Mu_wall=material_in_wall.Mu).calculate()  # Уонг стр 68
     a_in = a(nusselt=avg_Nu_in, lambd=material_in_avg.lambd, d=d_in)  # коэф теплоотдачи внутренний
@@ -86,24 +91,22 @@ def calculate():
     l = material_in_inlet.ro * v_in * material_in_inlet.c_p * pi * ((d_in / 2) ** 2) * (t_inlet - t_out) / (
             k_l * delta_T_ln)  # из уравнения теплового баланса
     ksi = 0.184 / (Re_in ** 0.2)  # коэф гидр потерь Исаченко стр 215
-    delta_p = ksi * (l / d_in) * (0.5 * material_in_inlet.ro * v_in ** 2)  # перепад давления
+    delta_p = ksi * (l / d_in) * (0.5 * material_in_inlet.ro * v_in ** 2)
 
     output_text.delete(1.0, tk.END)
     output_text.insert(tk.END, f'Re внешнего течения: {Re_external[0]:.6}\nRe внутренного течения: {Re_in[0]:.6}\n')
     output_text.insert(tk.END, f'delta_T_max: {delta_T_max:.6} °C\ndelta_T_min: {delta_T_min:.6} °C\n')
-    output_text.insert(tk.END, f'delta_T_ln: {delta_T_ln:.6}\nt_avg: {t_avg:.6} °C\n')
-    output_text.insert(tk.END, f'average Nu external: {avg_Nu_external[0]:.6}\na external: {a_external[0]:.6}\n')
-    output_text.insert(tk.END, f'average Nu internal: {avg_Nu_in[0]:.6}\na internal: {a_in[0]:.6}\n')
-    output_text.insert(tk.END, f'k_l: {k_l[0]:.6}\nksi: {ksi[0]:.6}\n')
+    output_text.insert(tk.END, f'delta_T_ln: {delta_T_ln:.6}\navarage T: {t_avg:.6} °C\nwall T: {t_wall:.6} °C\n')
+    output_text.insert(tk.END,
+                       f'average Nu external: {avg_Nu_external[0]:.6}\na external: {a_external[0]:.6} Вт/(м^2·K)\n')
+    output_text.insert(tk.END, f'average Nu internal: {avg_Nu_in[0]:.6}\na internal: {a_in[0]:.6} Вт/(м^2·K)\n')
+    output_text.insert(tk.END,
+                       f'Линейный коэффциент теплопередачи: {k_l[0]:.6} Вт/(м·K)\nКоэффицент гидравлических потерь: {ksi[0]:.6}\n')
     output_text.insert(tk.END, f'Длина трубы: {l[0]:.6} м\nПерепад давления: {delta_p[0]:.6} Па')
 
 
-def clear_output():
-    output_text.delete('1.0', tk.END)
-
-
 root = tk.Tk()
-root.title("Конвекция 1.0.1")
+root.title("Конвекция 1.1.0")
 
 # создаем и размещаем элементы интерфейса
 label_t_inlet = tk.Label(root, text="Входная температура, °C")
@@ -160,31 +163,37 @@ entry_v_in = tk.Entry(root)
 entry_v_in.grid(row=8, column=1)
 entry_v_in.insert(0, "0.089")
 
-label_lambda_pipe = tk.Label(root, text="Теплопроводность трубы, Вт/(м*K)")
+label_lambda_pipe = tk.Label(root, text="Теплопроводность трубы, Вт/(м·K)")
 label_lambda_pipe.grid(row=9, column=0)
 entry_lambda_pipe = tk.Entry(root)
 entry_lambda_pipe.grid(row=9, column=1)
 entry_lambda_pipe.insert(0, "0.24")
 
-label_path_external = tk.Label(root, text="Путь к данным для наружной жидкости")
+label_path_external = tk.Label(root, text="Наружная жидкость")
 label_path_external.grid(row=10, column=0)
-entry_path_external = ttk.Combobox(root, values=["data/water.csv", "data/air.csv"])
+entry_path_external = ttk.Combobox(root, values=["water", "air"])
 entry_path_external.grid(row=10, column=1)
 entry_path_external.current(1)
 
-label_path_internal = tk.Label(root, text="Путь к данным для внутренней жидкости")
+label_path_internal = tk.Label(root, text="Внутренняя жидкость")
 label_path_internal.grid(row=11, column=0)
-entry_path_internal = ttk.Combobox(root, values=["data/water.csv", "data/air.csv"])
+entry_path_internal = ttk.Combobox(root, values=["water", "air"])
 entry_path_internal.grid(row=11, column=1)
 entry_path_internal.current(0)
 
-button_calculate = tk.Button(root, text="Calculate", command=calculate)
-button_calculate.grid(row=12, columnspan=2)
+label_rad = tk.Label(root, text="Учитывать излучение")
+label_rad.grid(row=12, column=0)
+rad = BooleanVar()
+entry_rad = Checkbutton(root, variable=rad)
+entry_rad.grid(row=12, column=1)
 
-output_text = scrolledtext.ScrolledText(root, width=40, height=15, wrap=tk.WORD)
-output_text.grid(row=13, columnspan=2)
+button_calculate = tk.Button(root, text="Calculate", command=calculate)
+button_calculate.grid(row=13, columnspan=2)
+
+output_text = scrolledtext.ScrolledText(root, width=50, height=15, wrap=tk.WORD)
+output_text.grid(row=14, columnspan=2)
 
 button_clear = tk.Button(root, text="About", command=show_about)
-button_clear.grid(row=14, columnspan=2)
+button_clear.grid(row=15, columnspan=2)
 
 root.mainloop()
