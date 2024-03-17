@@ -2,27 +2,28 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, BooleanVar, Checkbutton
 from math import log, pi
 from Nu import Nu
-from Models import Material
+from Material import Material
 from buttons import show_error_popup, show_about
 from radiantion import radiation
 
 
 def a(nusselt: float, lambd: float, d: float):
-    # коэф теплоотдачи
     return nusselt * lambd / d
 
 
 def calculate():
-    path_external = 'data/' + entry_path_external.get() + '.csv'
-    path_internal = 'data/' + entry_path_internal.get() + '.csv'
+    path_external = entry_path_external.get()
+    path_internal = entry_path_internal.get()
     is_use_radiation = rad.get()
 
-    is_gaz_external = True
-    is_gaz_internal = True
-    if path_external == 'data/water.csv':
+    if path_external == 'water':
         is_gaz_external = False
-    if path_internal == 'data/water.csv':
+    else:
+        is_gaz_external = True
+    if path_internal == 'water':
         is_gaz_internal = False
+    else:
+        is_gaz_internal = True
 
     t_inlet = float(entry_t_inlet.get())
     t_out = float(entry_t_out.get())
@@ -38,16 +39,16 @@ def calculate():
         show_error_popup('Неверная внешняя температура (0 C < T < 100 C)')
 
     if (t_out > t_inlet and t_external < t_inlet) or (t_out < t_inlet and t_external > t_inlet):
-        show_error_popup('Указанная выходная температура недостижима')
+        show_error_popup('Неверная выходная температура')
 
     d_in = float(entry_d_in.get())
     d_external = float(entry_d_external.get())
     if d_in >= d_external or d_in == 0:
-        show_error_popup('Неверные размеры трубы')
+        show_error_popup('Неверные параметры трубы')
 
     v_external = float(entry_v_external.get())
     v_in = float(entry_v_in.get())
-    if v_in <= 0 or v_external <= 0 or v_in > 3e+8 or v_external > 3e+8:
+    if v_in <= 1e-6 or v_external <= 1e-6 or v_in > 3e+8 or v_external > 3e+8:
         show_error_popup('Неверное значение скорости')
 
     p_inlet = float(entry_p_inlet.get())
@@ -56,14 +57,14 @@ def calculate():
         show_error_popup('Неверное значение давления')
 
     lambda_pipe = float(entry_lambda_pipe.get())
-    if lambda_pipe <= 0:
+    if lambda_pipe <= 0 or lambda_pipe >= 1e+5:
         show_error_popup('Неверное значение теплопроводности трубы')
 
     t_avg = (t_inlet + t_out) / 2
     t_wall = (t_external + t_avg) / 2
     delta_T_max = max((t_inlet - t_external), (t_out - t_external))
     delta_T_min = min((t_inlet - t_external), (t_out - t_external))
-    delta_T_ln = (delta_T_max - delta_T_min) / log(delta_T_max / delta_T_min)  # log профиль температуры
+    delta_T_ln = (delta_T_max - delta_T_min) / log(delta_T_max / delta_T_min)
 
     # свойства материалов при заданной температуре и давлении
     material_external = Material(T=t_external, p=p_external, path=path_external)
@@ -86,29 +87,27 @@ def calculate():
     a_in = a(nusselt=avg_Nu_in, lambd=material_in_avg.lambd, d=d_in)  # коэф теплоотдачи внутренний
 
     k_l = pi * (1 / (a_in * d_in) + log(d_external / d_in) / (2 * lambda_pipe) + 1 / (
-            a_external * d_external)) ** -1  # линейный коэффициент теплоотдачи, Исаченко стр 37
+            a_external * d_external)) ** -1  # линейный коэф теплоотдачи, Исаченко стр 37
 
     l = material_in_inlet.ro * v_in * material_in_inlet.c_p * pi * ((d_in / 2) ** 2) * (t_inlet - t_out) / (
             k_l * delta_T_ln)  # из уравнения теплового баланса
-    ksi = 0.184 / (Re_in ** 0.2)  # коэф гидр потерь Исаченко стр 215
-    delta_p = ksi * (l / d_in) * (0.5 * material_in_inlet.ro * v_in ** 2)
+    delta_p = 0.184 / (Re_in ** 0.2) * (l / d_in) * (0.5 * material_in_inlet.ro * v_in ** 2)
 
     output_text.delete(1.0, tk.END)
-    output_text.insert(tk.END, f'Re внешнего течения: {Re_external[0]:.6}\nRe внутренного течения: {Re_in[0]:.6}\n')
-    output_text.insert(tk.END, f'delta_T_max: {delta_T_max:.6} °C\ndelta_T_min: {delta_T_min:.6} °C\n')
-    output_text.insert(tk.END, f'delta_T_ln: {delta_T_ln:.6}\navarage T: {t_avg:.6} °C\nwall T: {t_wall:.6} °C\n')
+    output_text.insert(tk.END, f'Re external: {Re_external[0]:.5}\nRe internal: {Re_in[0]:.5}\n')
+    output_text.insert(tk.END, f'ΔT max: {delta_T_max:.5} °C\nΔT min: {delta_T_min:.5} °C\n')
+    output_text.insert(tk.END, f'ΔT log: {delta_T_ln:.5}\navarage T: {t_avg:.6} °C\nwall T: {t_wall:.5} °C\n')
     output_text.insert(tk.END,
-                       f'average Nu external: {avg_Nu_external[0]:.6}\na external: {a_external[0]:.6} Вт/(м^2·K)\n')
-    output_text.insert(tk.END, f'average Nu internal: {avg_Nu_in[0]:.6}\na internal: {a_in[0]:.6} Вт/(м^2·K)\n')
+                       f'Nu external: {avg_Nu_external[0]:.5}\nα external: {a_external[0]:.5} Вт/(м^2·K)\n')
+    output_text.insert(tk.END, f'Nu internal: {avg_Nu_in[0]:.5}\nα internal: {a_in[0]:.5} Вт/(м^2·K)\n')
     output_text.insert(tk.END,
-                       f'Линейный коэффциент теплопередачи: {k_l[0]:.6} Вт/(м·K)\nКоэффицент гидравлических потерь: {ksi[0]:.6}\n')
-    output_text.insert(tk.END, f'Длина трубы: {l[0]:.6} м\nПерепад давления: {delta_p[0]:.6} Па')
+                       f'Линейный коэффциент теплопередачи: {k_l[0]:.5} Вт/(м·K)\n')
+    output_text.insert(tk.END, f'Длина трубы: {l[0]:.5} м\nПерепад давления: {delta_p[0]:.5} Па')
 
 
 root = tk.Tk()
-root.title("Конвекция 1.1.0")
+root.title("Конвекция 1.1.1")
 
-# создаем и размещаем элементы интерфейса
 label_t_inlet = tk.Label(root, text="Входная температура, °C")
 label_t_inlet.grid(row=0, column=0)
 entry_t_inlet = tk.Entry(root)
@@ -190,7 +189,7 @@ entry_rad.grid(row=12, column=1)
 button_calculate = tk.Button(root, text="Calculate", command=calculate)
 button_calculate.grid(row=13, columnspan=2)
 
-output_text = scrolledtext.ScrolledText(root, width=50, height=15, wrap=tk.WORD)
+output_text = scrolledtext.ScrolledText(root, width=50, height=14, wrap=tk.WORD)
 output_text.grid(row=14, columnspan=2)
 
 button_clear = tk.Button(root, text="About", command=show_about)

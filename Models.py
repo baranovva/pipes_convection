@@ -1,9 +1,10 @@
-from numpy import arange, array, where
+import numpy as np
 from pandas import read_csv
-from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import make_pipeline
+from joblib import dump
 
 
 class DataPreparing:
@@ -22,7 +23,7 @@ class Models:
         self.targets_train = targets_train
 
     def regression(self) -> object:
-        parameters = {'polynomialfeatures__degree': arange(1, 5)}
+        parameters = {'polynomialfeatures__degree': np.arange(1, 5)}
         search = GridSearchCV(make_pipeline(PolynomialFeatures(), LinearRegression()),
                               param_grid=parameters)
         search.fit(self.samples_train, self.targets_train)
@@ -31,29 +32,13 @@ class Models:
         return LinearRegression(n_jobs=-1).fit(poly, self.targets_train), best_degree
 
 
-class Material:
-    def __init__(self, T, p, path):
-        self.T = T
-        self.p = p
-
-        index = array(read_csv(path, header=0, sep=',', usecols=[0]))
-
-        if round(T) not in index:
-            samples, targets = DataPreparing(path).split_data()
-            regression, degree = Models(samples, targets).regression()
-            material = regression.predict(self._temp(degree))
-        else:
-            index = where(index == round(T))[0]
-            material = array(read_csv(path, header=0, sep=',', usecols=range(1, 6), skiprows=index[0], nrows=1))
-
-        if path == "data/air.csv":
-            self.ro = p * material[:, 0]
-        else:
-            self.ro = material[:, 0]
-        self.c_p = material[:, 1]
-        self.lambd = material[:, 2]
-        self.Pr = material[:, 3]
-        self.Mu = material[:, 4]
-
-    def _temp(self, PF_degree: float):
-        return PolynomialFeatures(PF_degree).fit_transform(array([self.T]).reshape(-1, 1))
+path = 'data/water.csv'
+samples, targets = DataPreparing(path).split_data()
+regression, degree = Models(samples, targets).regression()
+print(degree)
+print(regression.coef_)
+print(regression.intercept_)
+if path == "data/air.csv":
+    dump(regression, 'models/air.joblib')
+else:
+    dump(regression, 'models/water.joblib')
