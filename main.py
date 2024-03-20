@@ -15,6 +15,9 @@ def calculate():
     path_external = entry_path_external.get()
     path_internal = entry_path_internal.get()
     is_use_radiation = rad.get()
+    eps = float(entry_eps.get())
+    if eps < 0 or eps > 1:
+        show_error_popup('Неверная степень черноты')
 
     if path_external == 'water':
         is_gaz_external = False
@@ -81,9 +84,6 @@ def calculate():
 
     a_external_rad = 0.
     if is_use_radiation and is_gaz_external:
-        eps = float(entry_eps.get())
-        if eps < 0 or eps > 1:
-            show_error_popup('Неверная степень черноты')
         a_external_rad = radiation(t_wall, eps)
     a_external = a_external_conv + a_external_rad
 
@@ -116,9 +116,63 @@ def calculate():
     output_text.insert(tk.END, f'Длина трубы: {l[0]:.5} м\n')
     output_text.insert(tk.END, f'Перепад давления: {delta_p[0]:.5} Па')
 
+    def write_to_file():
+        from datetime import datetime
+        file_name = str(datetime.now().strftime("%Y-%m-%d %H-%M-%S")) + '.txt'
+        with open(file_name, "w", encoding="utf-8") as file:
+            file.write(f'Время расчета: {datetime.now()}\n')
+            file.write(f'=====================\n')
+            file.write(f'Внешняя жидкость: {path_external}\n')
+            file.write(f'Внутренняя жидкость: {path_internal}\n')
+            file.write(f'Внутреннее входное давление: {p_inlet} атм\n')
+            file.write(f'Внешнее давление: {p_external} атм\n')
+            file.write(f'=====================\n')
+            file.write(f"Внутренний диаметр трубы: {d_in} м\n")
+            file.write(f"Внешний диаметр трубы: {d_external} м\n")
+            file.write(f"Теплопроводность трубы: {lambda_pipe} Вт/(м·K)\n")
+            file.write(f'=====================\n')
+            file.write(f"Скорость внешнего течения: {v_in} м/с\n")
+            file.write(f"Скорость внутреннего течения: {v_external} м/с\n")
+            file.write(f'Re internal: {Re_in[0]:.5}\n')
+            file.write(f'Re external: {Re_external[0]:.5}\n')
+            file.write(f'=====================\n')
+            file.write(f'Входная температура: {t_inlet} °C\n')
+            file.write(
+                    f'Свойства {path_internal}: ro={material_in_inlet.ro[0]:.5} кг/м^3, c_p={material_in_inlet.c_p[0]:.5} Дж/(кг·K), lambda={material_in_inlet.lambd[0]:.5} Вт/(м·К), Pr={material_in_inlet.Pr[0]:.5}, Mu={material_in_inlet.Mu[0]:.5} H·c/м^2\n')
+            file.write(f'Температура внешней среды: {t_external:.6} °C\n')
+            file.write(
+                    f'Свойства {path_external}: ro={material_external.ro[0]:.5} кг/м^3, c_p={material_external.c_p[0]:.5} Дж/(кг·K), lambda={material_external.lambd[0]:.5} Вт/(м·К), Pr={material_external.Pr[0]:.5}, Mu={material_external.Mu[0]:.5} H·c/м^2\n')
+            file.write(f'avarage T: {t_avg:.6} °C\n')
+            file.write(
+                    f'Свойства {path_internal}: ro={material_in_avg.ro[0]:.5} кг/м^3, c_p={material_in_avg.c_p[0]:.5} Дж/(кг·K), lambda={material_in_avg.lambd[0]:.5} Вт/(м·К), Pr={material_in_avg.Pr[0]:.5}, Mu={material_in_avg.Mu[0]:.5} H·c/м^2\n')
+            file.write(f'wall T: {t_wall:.5} °C\n')
+            file.write(
+                    f'Свойства {path_internal}: ro={material_in_wall.ro[0]:.5} кг/м^3, c_p={material_in_wall.c_p[0]:.5} Дж/(кг·K), lambda={material_in_wall.lambd[0]:.5} Вт/(м·К), Pr={material_in_wall.Pr[0]:.5}, Mu={material_in_wall.Mu[0]:.5} H·c/м^2\n')
+            file.write(f'=====================\n')
+            file.write(f'Выходная температура: {t_out} °C\n')
+            file.write(f'ΔT max: {delta_T_max:.5} °C\n')
+            file.write(f'ΔT min: {delta_T_min:.5} °C\n')
+            file.write(f'ΔT log: {delta_T_ln:.5}\n')
+            file.write(f'=====================\n')
+            file.write(f'Nu external: {avg_Nu_external[0]:.5}\n')
+            file.write(f'Nu internal: {avg_Nu_in[0]:.5}\n')
+            file.write(f'α external: {a_external[0]:.5} Вт/(м^2·K)\n')
+            file.write(f'α external conv: {a_external_conv[0]:.5}  Вт/(м^2·K)\n')
+            file.write(f'α internal: {a_in[0]:.5} Вт/(м^2·K)\n')
+            file.write(f'=====================\n')
+            file.write(f'Учитывать радиационное изучение: {is_use_radiation}\n')
+            file.write(f'Степень черноты: {eps}\n')
+            file.write(f'α external rad: {a_external_rad:.5} Вт/(м^2·K)\n')
+            file.write(f'=====================\n')
+            file.write(f'Линейный коэффциент теплопередачи: {k_l[0]:.5} Вт/(м·K)\n')
+            file.write(f'Длина трубы: {l[0]:.5} м\n')
+            file.write(f'Перепад давления: {delta_p[0]:.5} Па')
+
+    write_to_file()
+
 
 root = tk.Tk()
-root.title("Конвекция 1.1.2")
+root.title("Конвекция 1.1.3")
 
 label_t_inlet = tk.Label(root, text="Входная температура, °C")
 label_t_inlet.grid(row=0, column=0)
