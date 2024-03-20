@@ -70,5 +70,7 @@ class Nu:
             elif not self.is_gaz and (self.Pr > 0.6 and self.Pr < 100):
                 # если среда - жидкость
                 return 0.027 * (self.Re ** 0.8) * (self.Pr ** 0.33) * ((self.Mu / self.Mu_wall) ** 0.14)
+            elif self.Re <= 2000:
+                return [3.66]
             else:
                 show_error_popup('Неверный интервал значений (Nu internal)')

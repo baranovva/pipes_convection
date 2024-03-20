@@ -31,11 +31,11 @@ def calculate():
 
     if is_gaz_internal and (t_inlet < -50 or t_inlet > 1200):
         show_error_popup('Неверная входная температура (-50 C < T < 1200 C)')
-    if is_gaz_external and (t_external < -50 or t_inlet > 1200):
+    if is_gaz_external and (t_external < -50 or t_external > 1200):
         show_error_popup('Неверная внешняя температура (-50 C < T < 1200 C)')
     if not is_gaz_internal and (t_inlet < 0 or t_inlet > 100):
         show_error_popup('Неверная входная температура (0 C < T < 100 C)')
-    if is_gaz_external and (t_external < 0 or t_inlet > 100):
+    if not is_gaz_external and (t_external < 0 or t_external > 100):
         show_error_popup('Неверная внешняя температура (0 C < T < 100 C)')
 
     if (t_out > t_inlet and t_external < t_inlet) or (t_out < t_inlet and t_external > t_inlet):
@@ -77,14 +77,19 @@ def calculate():
 
     avg_Nu_external = Nu.NuExternal(Re=Re_external, Pr=material_external.Pr,
                                     is_gaz=is_gaz_external).calculate()  # Уонг стр 72
-    a_external = a(nusselt=avg_Nu_external, lambd=material_external.lambd, d=d_external)  # коэф теплоотдачи внешний
+    a_external_conv = a(nusselt=avg_Nu_external, lambd=material_external.lambd, d=d_external)
 
+    a_external_rad = 0.
     if is_use_radiation and is_gaz_external:
-        a_external += radiation(t_wall)
+        eps = float(entry_eps.get())
+        if eps < 0 or eps > 1:
+            show_error_popup('Неверная степень черноты')
+        a_external_rad = radiation(t_wall, eps)
+    a_external = a_external_conv + a_external_rad
 
     avg_Nu_in = Nu.NuInternal(Re=Re_in, Pr=material_in_avg.Pr, is_gaz=is_gaz_internal,
                               Mu=material_in_avg.Mu, Mu_wall=material_in_wall.Mu).calculate()  # Уонг стр 68
-    a_in = a(nusselt=avg_Nu_in, lambd=material_in_avg.lambd, d=d_in)  # коэф теплоотдачи внутренний
+    a_in = a(nusselt=avg_Nu_in, lambd=material_in_avg.lambd, d=d_in)
 
     k_l = pi * (1 / (a_in * d_in) + log(d_external / d_in) / (2 * lambda_pipe) + 1 / (
             a_external * d_external)) ** -1  # линейный коэф теплоотдачи, Исаченко стр 37
@@ -94,19 +99,26 @@ def calculate():
     delta_p = 0.184 / (Re_in ** 0.2) * (l / d_in) * (0.5 * material_in_inlet.ro * v_in ** 2)
 
     output_text.delete(1.0, tk.END)
-    output_text.insert(tk.END, f'Re external: {Re_external[0]:.5}\nRe internal: {Re_in[0]:.5}\n')
-    output_text.insert(tk.END, f'ΔT max: {delta_T_max:.5} °C\nΔT min: {delta_T_min:.5} °C\n')
-    output_text.insert(tk.END, f'ΔT log: {delta_T_ln:.5}\navarage T: {t_avg:.6} °C\nwall T: {t_wall:.5} °C\n')
-    output_text.insert(tk.END,
-                       f'Nu external: {avg_Nu_external[0]:.5}\nα external: {a_external[0]:.5} Вт/(м^2·K)\n')
-    output_text.insert(tk.END, f'Nu internal: {avg_Nu_in[0]:.5}\nα internal: {a_in[0]:.5} Вт/(м^2·K)\n')
-    output_text.insert(tk.END,
-                       f'Линейный коэффциент теплопередачи: {k_l[0]:.5} Вт/(м·K)\n')
-    output_text.insert(tk.END, f'Длина трубы: {l[0]:.5} м\nПерепад давления: {delta_p[0]:.5} Па')
+    output_text.insert(tk.END, f'Re external: {Re_external[0]:.5}\n')
+    output_text.insert(tk.END, f'Re internal: {Re_in[0]:.5}\n')
+    output_text.insert(tk.END, f'ΔT max: {delta_T_max:.5} °C\n')
+    output_text.insert(tk.END, f'ΔT min: {delta_T_min:.5} °C\n')
+    output_text.insert(tk.END, f'ΔT log: {delta_T_ln:.5}\n')
+    output_text.insert(tk.END, f'avarage T: {t_avg:.6} °C\n')
+    output_text.insert(tk.END, f'wall T: {t_wall:.5} °C\n')
+    output_text.insert(tk.END, f'Nu external: {avg_Nu_external[0]:.5}\n')
+    output_text.insert(tk.END, f'Nu internal: {avg_Nu_in[0]:.5}\n')
+    output_text.insert(tk.END, f'α external: {a_external[0]:.5} Вт/(м^2·K)\n')
+    output_text.insert(tk.END, f'α external conv: {a_external_conv[0]:.5}  Вт/(м^2·K)\n')
+    output_text.insert(tk.END, f'α external rad: {a_external_rad:.5} Вт/(м^2·K)\n')
+    output_text.insert(tk.END, f'α internal: {a_in[0]:.5} Вт/(м^2·K)\n')
+    output_text.insert(tk.END, f'Линейный коэффциент теплопередачи: {k_l[0]:.5} Вт/(м·K)\n')
+    output_text.insert(tk.END, f'Длина трубы: {l[0]:.5} м\n')
+    output_text.insert(tk.END, f'Перепад давления: {delta_p[0]:.5} Па')
 
 
 root = tk.Tk()
-root.title("Конвекция 1.1.1")
+root.title("Конвекция 1.1.2")
 
 label_t_inlet = tk.Label(root, text="Входная температура, °C")
 label_t_inlet.grid(row=0, column=0)
@@ -168,31 +180,37 @@ entry_lambda_pipe = tk.Entry(root)
 entry_lambda_pipe.grid(row=9, column=1)
 entry_lambda_pipe.insert(0, "0.24")
 
+label_rad = tk.Label(root, text="Учитывать излучение")
+label_rad.grid(row=10, column=0)
+rad = BooleanVar()
+entry_rad = Checkbutton(root, variable=rad)
+entry_rad.grid(row=10, column=1)
+
+label_eps = tk.Label(root, text="Степень черноты")
+label_eps.grid(row=11, column=0)
+entry_eps = tk.Entry(root)
+entry_eps.grid(row=11, column=1)
+entry_eps.insert(0, "0.5")
+
 label_path_external = tk.Label(root, text="Наружная жидкость")
-label_path_external.grid(row=10, column=0)
+label_path_external.grid(row=12, column=0)
 entry_path_external = ttk.Combobox(root, values=["water", "air"])
-entry_path_external.grid(row=10, column=1)
+entry_path_external.grid(row=12, column=1)
 entry_path_external.current(1)
 
 label_path_internal = tk.Label(root, text="Внутренняя жидкость")
-label_path_internal.grid(row=11, column=0)
+label_path_internal.grid(row=13, column=0)
 entry_path_internal = ttk.Combobox(root, values=["water", "air"])
-entry_path_internal.grid(row=11, column=1)
+entry_path_internal.grid(row=13, column=1)
 entry_path_internal.current(0)
 
-label_rad = tk.Label(root, text="Учитывать излучение")
-label_rad.grid(row=12, column=0)
-rad = BooleanVar()
-entry_rad = Checkbutton(root, variable=rad)
-entry_rad.grid(row=12, column=1)
-
 button_calculate = tk.Button(root, text="Calculate", command=calculate)
-button_calculate.grid(row=13, columnspan=2)
+button_calculate.grid(row=14, columnspan=2)
 
-output_text = scrolledtext.ScrolledText(root, width=50, height=14, wrap=tk.WORD)
-output_text.grid(row=14, columnspan=2)
+output_text = scrolledtext.ScrolledText(root, width=50, height=16, wrap=tk.WORD)
+output_text.grid(row=15, columnspan=2)
 
 button_clear = tk.Button(root, text="About", command=show_about)
-button_clear.grid(row=15, columnspan=2)
+button_clear.grid(row=16, columnspan=2)
 
 root.mainloop()

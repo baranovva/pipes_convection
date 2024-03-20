@@ -12,7 +12,7 @@ def show_error_popup(error_msg):
     popup.mainloop()
 
 
-def open_link():
+def open_link(event):
     open_new("https://github.com/baranovva/pipes_convection")
 
 

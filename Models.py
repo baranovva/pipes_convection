@@ -4,7 +4,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import make_pipeline
-from joblib import dump
+import matplotlib.pyplot as plt
 
 
 class DataPreparing:
@@ -23,22 +23,40 @@ class Models:
         self.targets_train = targets_train
 
     def regression(self) -> object:
-        parameters = {'polynomialfeatures__degree': np.arange(1, 5)}
+        parameters = {'polynomialfeatures__degree': np.arange(1, 15)}
         search = GridSearchCV(make_pipeline(PolynomialFeatures(), LinearRegression()),
                               param_grid=parameters)
         search.fit(self.samples_train, self.targets_train)
-        best_degree = search.best_params_['polynomialfeatures__degree']
+        best_degree = search.best_params_['polynomialfeatures__degree']  # 5
         poly = PolynomialFeatures(degree=best_degree).fit_transform(self.samples_train)
         return LinearRegression(n_jobs=-1).fit(poly, self.targets_train), best_degree
 
 
 path = 'data/water.csv'
-samples, targets = DataPreparing(path).split_data()
-regression, degree = Models(samples, targets).regression()
-print(degree)
-print(regression.coef_)
-print(regression.intercept_)
-if path == "data/air.csv":
-    dump(regression, 'models/air.joblib')
+if path == 'data/water.csv':
+    samples, targets = DataPreparing(path).split_data()
+    s = np.linspace(0, 100, 100)
+    for i in range(5):
+        regression, degree = Models(samples, np.array(targets.iloc[:, i]).reshape(-1, 1)).regression()
+        pred = regression.predict(PolynomialFeatures(degree=degree).fit_transform(np.array(s).reshape(-1, 1)))
+        plt.scatter(samples, targets.iloc[:, i])
+        plt.scatter(s, pred)
+        plt.show()
+
+        print(degree)
+        print(regression.coef_)
+        print(regression.intercept_)
+
 else:
-    dump(regression, 'models/water.joblib')
+    samples, targets = DataPreparing(path).split_data()
+    s = np.linspace(-50, 1200, 200)
+    for i in range(5):
+        regression, degree = Models(samples, np.array(targets.iloc[:, i]).reshape(-1, 1)).regression()
+        pred = regression.predict(PolynomialFeatures(degree=degree).fit_transform(np.array(s).reshape(-1, 1)))
+        plt.scatter(samples, targets.iloc[:, i])
+        plt.scatter(s, pred)
+        plt.show()
+
+        print(degree)
+        print(regression.coef_)
+        print(regression.intercept_)
